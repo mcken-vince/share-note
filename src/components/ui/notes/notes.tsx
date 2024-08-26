@@ -11,41 +11,79 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "../table";
 import { Input } from "../input";
 import { Label } from "../label";
+import { Checkbox } from "../checkbox";
 
-export type Note = { title: string, type: 'note' | 'checklist', items?: any[], body?: string, createdAt: Date, modifiedAt: Date, deletedAt?: Date };
+export type Note = { title: string, type: 'note' | 'checklist', items?: {checked: boolean, body: string}[], body?: string, createdAt: Date, modifiedAt: Date, deletedAt?: Date };
 
 export const Notes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [editMode, setEditMode] = useState(false);
 
-function saveNote(note: Note) {
-  setNotes(prev => prev.map(prevNote => prevNote.createdAt === note.createdAt ? {...note, modifiedAt: new Date()} : prevNote));
-  setEditMode(false);
-  setSelectedNote(null);
+function updateSelectedNote(update: Partial<Note>) {
+  setSelectedNote(prev => prev ? { ...prev, ...update } : prev);
 }
+
+  function checkNoteItemBox(index: number, checked: boolean) {
+    setNotes(prev => prev.map((prevNote, idx) => index === idx ? { ...prevNote, modifiedAt: new Date(), checked } : prevNote));
+  }
+
+  function saveNote(note: Note) {
+    setNotes(prev => prev.map(prevNote => prevNote.createdAt === note.createdAt ? { ...note, modifiedAt: new Date() } : prevNote));
+  }
+
+  function closeNote() {
+    setEditMode(false);
+    setSelectedNote(null);
+  }
+
+  function saveAndCloseNote(note: Note) {
+    saveNote(note);
+    closeNote()
+  }
 
   if (selectedNote) {
     return (
       <div>
         <div className="flex justify-between items-center mb-2">
           <Button onClick={() => setSelectedNote(null)}>{'<- '}</Button>
-          <Button onClick={() => !editMode ? setEditMode(true) : saveNote(selectedNote)}>{editMode ? 'Save' : 'Edit'}</Button>
-          </div>
-       <div className="p-2">
+          <Button onClick={() => !editMode ? setEditMode(true) : saveAndCloseNote(selectedNote)}>{editMode ? 'Save' : 'Edit'}</Button>
+        </div>
+        <div className="p-2">
 
-        <Label>Title</Label>
-        {editMode ? <Input value={selectedNote.title} onChange={(event) => setSelectedNote(prev => (prev ? {...prev, title: event.target.value} : prev))}/> :
-        <h1>{selectedNote.title}</h1>}
+          <Label>Title</Label>
+          {editMode ? <Input value={selectedNote.title} onChange={(event) => updateSelectedNote({title: event.target.value})} /> :
+            <h1>{selectedNote.title}</h1>}
         </div>
         {selectedNote.type === 'checklist' ?
-        <ul>
-          {selectedNote.items?.map((item, index) => (
-            <li key={index}>{item}</li>
-          ))}
-        </ul>
-        : <p>{selectedNote.body}</p>} 
-      
+          <>
+            <ul>
+              {selectedNote.items?.map((item, index) => (
+
+                <li key={index} className="flex items-center gap-2 px-4 py-2">
+                  <Checkbox checked={item.checked} className="h-7 w-7"
+                    onCheckedChange={(checked) => {
+                      setSelectedNote(prev => prev ? {
+                        ...prev, items: [...(prev.items || []).map((listItem, idx) => idx === index ? {
+                          ...listItem, checked: !!checked
+                        } : listItem
+                        )]
+                      } : prev);
+                      if (typeof checked === 'boolean') {
+                        checkNoteItemBox(index, checked);
+                      }
+                    }}
+                  /> {editMode ?
+                    <Input value={item.body} onChange={(event) => setSelectedNote(prev => prev ? { ...prev, items: [...(prev.items || []).map((listItem, idx) => idx === index ? ({ ...listItem, body: event.target.value }) : listItem)] } : prev)} />
+                    : item.body}</li>
+              ))}
+            </ul>
+            {editMode &&
+              <Button onClick={() => setSelectedNote(prev => prev ? { ...prev, items: [...(prev.items || []), { body: '', checked: false }] } : prev)}>Add Item</Button>
+            }
+          </>
+          : <p>{selectedNote.body}</p>}
+
       </div>
     )
   }
@@ -82,7 +120,7 @@ function saveNote(note: Note) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {notes.map((note) => (
+          {notes.toSorted((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime()).map((note) => (
             <TableRow key={`note-${note.createdAt.toDateString()}`} onClick={() => { setSelectedNote(note); setEditMode(false); }}>
               <TableCell className="font-medium">{note.title}</TableCell>
               <TableCell>{note.type}</TableCell>
