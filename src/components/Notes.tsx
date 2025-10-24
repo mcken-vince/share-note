@@ -1,15 +1,13 @@
 'use client'
 import { useState, useEffect } from "react";
-import { Button } from "../button";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "../table";
-import { Input } from "../input";
-import { Label } from "../label";
-import { Checkbox } from "../checkbox";
-import { Textarea } from "../textarea";
+import { Button } from "./ui/button";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Checkbox } from "./ui/checkbox";
+import { Textarea } from "./ui/textarea";
 import { Bomb as BombIcon, X as XIcon, Plus as PlusIcon } from "lucide-react";
-import { ConfirmationModal, NewNoteModal } from "../modals";
-import { TagList } from "../TagList";
-import { TagInput, SearchInput } from "../../";
+import { ConfirmationModal, NewNoteModal, TagList, TagInput, SearchInput } from ".";
 import { useNotesApi } from "@/hooks/useNotesApi";
 import type { Note } from "@/types";
 

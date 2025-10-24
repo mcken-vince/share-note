@@ -1,6 +1,4 @@
-import { Notes } from "@/components/ui/notes/Notes";
-
-import { TopNavBar } from "@/components/ui/topnav/TopNavBar";
+import { TopNavBar, Notes } from "@/components";
 export default function Home() {
   return (
     <main>

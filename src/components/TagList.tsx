@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from './badge';
+import { Badge } from './ui/badge';
 
 interface TagListProps {
   tags: string[];

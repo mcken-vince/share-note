@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '../button';
-import { Input } from '../input';
-import { Label } from '../label';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../dialog';
+} from './ui/dialog';
 
 interface NoteOption {
   type: 'note' | 'checklist';
