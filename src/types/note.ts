@@ -4,6 +4,7 @@ export interface NoteItem {
 }
 
 export interface Note {
+  id: string;
   title: string;
   type: 'note' | 'checklist';
   items?: NoteItem[];
