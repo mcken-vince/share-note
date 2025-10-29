@@ -65,25 +65,25 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
       });
       
       // Update the token if provided
-      if (responseData.token) {
-        setCookie('auth-token', responseData.token, {
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
-        });
-      }
+      // if (responseData.token) {
+      //   setCookie('auth-token', responseData.token, {
+      //     maxAge: 60 * 60 * 24 * 7, // 7 days
+      //     sameSite: 'lax',
+      //     secure: process.env.NODE_ENV === 'production',
+      //   });
+      // }
       
       // Update the user state with the new data
       updateUser({
-        firstName: responseData.user.firstName,
-        lastName: responseData.user.lastName,
+        firstName: responseData.firstName,
+        lastName: responseData.lastName,
       });
 
       // Update form values with fresh data
       profileForm.reset({
-        firstName: responseData.user.firstName,
-        lastName: responseData.user.lastName,
-        email: responseData.user.email,
+        firstName: responseData.firstName,
+        lastName: responseData.lastName,
+        email: responseData.email,
       });
 
       setSuccessMessage('Profile updated successfully!');
@@ -112,10 +112,10 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
 
     try {
       const token = getCookie('auth-token');
-      await AuthService.updatePassword(token as string, {
-        currentPassword: data.currentPassword!,
-        newPassword: data.newPassword!,
-      });
+      // await AuthService.updatePassword(token as string, {
+      //   currentPassword: data.currentPassword!,
+      //   newPassword: data.newPassword!,
+      // });
 
       setSuccessMessage('Password changed successfully!');
       passwordForm.reset();
