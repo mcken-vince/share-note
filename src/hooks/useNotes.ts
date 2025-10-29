@@ -7,6 +7,7 @@ import { serializeNotes, deserializeNotes } from '@/lib/dateUtils';
 import { generateId } from '@/lib/generateId';
 import { safelyMigrateNotes } from '@/lib/dataMigration';
 import { createSampleNotes, shouldLoadSampleData } from '@/lib/sampleData';
+import { generateUUID } from '@/lib/uuid';
 
 const NOTES_STORAGE_KEY = 'share-note-app-notes';
 
@@ -63,9 +64,11 @@ export function useNotes() {
     tags: string[];
     body?: string;
     items?: Array<{ checked: boolean; body: string }>;
+    userId?: string;
   }) => {
     const newNote: Note = {
       id: generateId(),
+      userId: noteData.userId || generateUUID(), // Generate UUID if not provided
       title: noteData.title,
       type: noteData.type,
       items: noteData.items || (noteData.type === 'checklist' ? [] : undefined),

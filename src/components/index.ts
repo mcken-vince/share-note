@@ -1,6 +1,8 @@
 export { ConfirmationModal } from './ConfirmationModal';
+export { LoginForm } from './LoginForm';
 export { NewNoteModal } from './NewNoteModal';
 export { Notes } from './Notes';
+export { ProfileForm } from './ProfileForm';
 export { SearchInput } from './SearchInput';
 export { TagInput } from './TagInput';
 export { TagList } from './TagList';

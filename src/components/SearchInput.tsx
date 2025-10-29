@@ -98,7 +98,7 @@ export const SearchInput = ({
       {hasSearch && (
         <div className="mt-2 text-sm text-muted-foreground">
           {filteredNotes.length === 0 ? (
-            <span>No notes found for "{searchTerm}"</span>
+            <span>No notes found for &quot;{searchTerm}&quot;</span>
           ) : (
             <span>
               {filteredNotes.length} of {notes.length} notes shown

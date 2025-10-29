@@ -28,8 +28,12 @@ describe('NotesService', () => {
         json: async () => ({ notes: mockNotes }),
       });
 
-      const result = await NotesService.getAllNotes();
-      expect(mockFetch).toHaveBeenCalledWith('/api/notes');
+      const result = await NotesService.getAllNotes('test-token');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/notes', {
+        headers: {
+          'Authorization': 'Bearer test-token',
+        },
+      });
       expect(result).toHaveLength(1);
       expect(new Date(result[0].createdAt)).toBeInstanceOf(Date);
       expect(new Date(result[0].modifiedAt)).toBeInstanceOf(Date);
@@ -42,7 +46,7 @@ describe('NotesService', () => {
         statusText: 'Internal Server Error',
       });
 
-      await expect(NotesService.getAllNotes()).rejects.toThrow(
+      await expect(NotesService.getAllNotes('test-token')).rejects.toThrow(
         'Failed to fetch notes: Internal Server Error'
       );
     });
@@ -50,7 +54,7 @@ describe('NotesService', () => {
     it('should handle network errors', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(NotesService.getAllNotes()).rejects.toThrow('Network error');
+      await expect(NotesService.getAllNotes('test-token')).rejects.toThrow('Network error');
     });
 
     it('should handle notes with deletedAt field', async () => {
@@ -72,7 +76,7 @@ describe('NotesService', () => {
         json: async () => ({ notes: mockNotes }),
       });
 
-      const result = await NotesService.getAllNotes();
+      const result = await NotesService.getAllNotes('test-token');
       expect(new Date(result[0].deletedAt!).toISOString()).toBe('2023-01-03T00:00:00.000Z');
     });
   });
@@ -82,6 +86,7 @@ describe('NotesService', () => {
       const mockNotes = [
         {
           id: '1',
+          userId: 'user-1',
           title: 'Test Note',
           type: 'note' as const,
           body: 'Content',
@@ -96,12 +101,13 @@ describe('NotesService', () => {
         json: async () => ({ success: true }),
       });
 
-      await NotesService.saveAllNotes(mockNotes);
+      await NotesService.saveAllNotes('test-token', mockNotes);
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/notes', {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/notes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-token',
         },
         body: JSON.stringify({ notes: mockNotes }),
       });
@@ -113,7 +119,7 @@ describe('NotesService', () => {
         statusText: 'Bad Request',
       });
 
-      await expect(NotesService.saveAllNotes([])).rejects.toThrow(
+      await expect(NotesService.saveAllNotes('test-token', [])).rejects.toThrow(
         'Failed to save notes: Bad Request'
       );
     });
@@ -124,7 +130,7 @@ describe('NotesService', () => {
         json: async () => ({ success: false }),
       });
 
-      await expect(NotesService.saveAllNotes([])).rejects.toThrow(
+      await expect(NotesService.saveAllNotes('test-token', [])).rejects.toThrow(
         'Server reported save failure'
       );
     });
@@ -132,7 +138,136 @@ describe('NotesService', () => {
     it('should handle network errors', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(NotesService.saveAllNotes([])).rejects.toThrow('Network error');
+      await expect(NotesService.saveAllNotes('test-token', [])).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('createNote', () => {
+    it('should create a note successfully', async () => {
+      const noteData = {
+        title: 'New Note',
+        type: 'note' as const,
+        tags: ['tag1'],
+        body: 'Note body',
+      };
+
+      const createdNote = {
+        id: 'generated-id',
+        userId: 'user-1',
+        ...noteData,
+        createdAt: '2023-01-01T00:00:00.000Z',
+        modifiedAt: '2023-01-01T00:00:00.000Z',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ note: createdNote }),
+      });
+
+      const result = await NotesService.createNote('test-token', noteData);
+
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/notes/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-token',
+        },
+        body: JSON.stringify(noteData),
+      });
+      expect(result.id).toBe('generated-id');
+      expect(result.title).toBe('New Note');
+    });
+
+    it('should handle create errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Bad Request',
+      });
+
+      await expect(
+        NotesService.createNote('test-token', {
+          title: 'Test',
+          type: 'note',
+          tags: [],
+        })
+      ).rejects.toThrow('Failed to create note: Bad Request');
+    });
+  });
+
+  describe('updateNote', () => {
+    it('should update a note successfully', async () => {
+      const updates = {
+        title: 'Updated Title',
+        body: 'Updated body',
+      };
+
+      const updatedNote = {
+        id: 'note-1',
+        userId: 'user-1',
+        type: 'note' as const,
+        tags: [],
+        createdAt: '2023-01-01T00:00:00.000Z',
+        modifiedAt: '2023-01-02T00:00:00.000Z',
+        ...updates,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ note: updatedNote }),
+      });
+
+      const result = await NotesService.updateNote('test-token', 'note-1', updates);
+
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/notes/note-1', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer test-token',
+        },
+        body: JSON.stringify(updates),
+      });
+      expect(result.title).toBe('Updated Title');
+      expect(result.body).toBe('Updated body');
+    });
+
+    it('should handle update errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Not Found',
+      });
+
+      await expect(
+        NotesService.updateNote('test-token', 'note-1', { title: 'Test' })
+      ).rejects.toThrow('Failed to update note: Not Found');
+    });
+  });
+
+  describe('deleteNote', () => {
+    it('should delete a note successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      await NotesService.deleteNote('test-token', 'note-1');
+
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/notes/note-1', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer test-token',
+        },
+      });
+    });
+
+    it('should handle delete errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Not Found',
+      });
+
+      await expect(NotesService.deleteNote('test-token', 'note-1')).rejects.toThrow(
+        'Failed to delete note: Not Found'
+      );
     });
   });
 });

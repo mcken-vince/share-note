@@ -1,13 +1,15 @@
 # Share-Note
 
-A simple note-taking application built with Next.js and React. Create, edit, and manage your notes and checklists in a clean, intuitive interface.
+A secure note-taking application built with Next.js and React. Create, edit, and manage your notes and checklists with user authentication and personalized content.
 
 ## Features
 
-- Create text notes and checklists
-- Edit notes with inline editing
-- View all notes in a sortable table
-- Responsive design with Tailwind CSS
+- **User Authentication**: Secure signup/login with JWT tokens
+- **Personalized Notes**: Each user has their own private note collection
+- **Create text notes and checklists**: Support for different note types
+- **Edit notes with inline editing**: Quick and easy note editing
+- **Tag and search functionality**: Organize and find notes efficiently
+- **Responsive design with Tailwind CSS**: Works on all devices
 
 ## Getting Started
 
@@ -33,18 +35,37 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Tech Stack
 
-- **Framework**: [Next.js](https://nextjs.org/)
+- **Framework**: [Next.js](https://nextjs.org/) 14 with App Router
+- **Authentication**: JWT with bcrypt password hashing
+- **Forms**: React Hook Form for validation
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **UI Components**: [Radix UI](https://www.radix-ui.com/)
+- **UI Components**: [Radix UI](https://www.radix-ui.com/) / shadcn/ui
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **TypeScript**: Full type safety
+- **Testing**: Jest with comprehensive test coverage
 
 ## Project Structure
 
-- `src/app/` - Next.js app router pages
-- `src/components/ui/` - Reusable UI components
-- `src/lib/` - Utility functions
-- `src/components/ui/notes/` - Note-specific components
+```
+share-note/
+├── src/
+│   ├── app/                    # Next.js pages (App Router)
+│   │   ├── api/                # API routes
+│   │   │   └── auth/          # Authentication endpoints
+│   │   ├── login/             # Login page
+│   │   └── notes/             # Protected notes page
+│   ├── components/            # React components
+│   │   └── ui/               # Base UI components (shadcn/ui)
+│   ├── services/             # Business logic services
+│   ├── context/              # React context (AuthContext)
+│   ├── hooks/                # Custom React hooks
+│   ├── types/                # TypeScript type definitions
+│   └── lib/                  # Utility functions
+├── data/                      # Local JSON data storage
+│   ├── notes.json            # Notes data
+│   └── users.json            # User data
+└── public/                    # Static assets
+```
 
 ## Deploy on Vercel
 

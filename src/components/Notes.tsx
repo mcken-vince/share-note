@@ -28,27 +28,19 @@ export const Notes = () => {
     }
   }, [notes, filteredNotes.length, hasSearchFilter]);
 
-function updateSelectedNote(update: Partial<Note>) {
-  setSelectedNote(prev => prev ? { ...prev, ...update } : prev);
-}
+  function updateSelectedNote(update: Partial<Note>) {
+    if (selectedNote) {
+      setSelectedNote(prev => prev ? { ...prev, ...update } : prev);
+    }
+  }
 
   async function checkNoteItemBox(noteId: string, itemIndex: number, checked: boolean) {
-    const note = notes.find(n => n.id === noteId);
-    if (note && note.items) {
-      const updatedItems = note.items.map((item, idx) => 
+    if (selectedNote && selectedNote.id === noteId) {
+      const updatedItems = selectedNote.items?.map((item, idx) => 
         idx === itemIndex ? { ...item, checked } : item
-      );
-      
-      try {
-        await updateNote(noteId, { items: updatedItems });
-        
-        // Update selected note if it's the same note
-        if (selectedNote?.id === noteId) {
-          setSelectedNote(prev => prev ? { ...prev, items: updatedItems } : prev);
-        }
-      } catch (error) {
-        console.error('Failed to update checklist item:', error);
-      }
+      ) || [];
+      setSelectedNote(prev => prev ? { ...prev, items: updatedItems } : prev);
+      await updateNote(noteId, { items: updatedItems });
     }
   }
 
@@ -118,19 +110,10 @@ function updateSelectedNote(update: Partial<Note>) {
    * Removes a checklist item from the selected note
    */
   async function removeChecklistItem(itemIndex: number) {
-    if (selectedNote && selectedNote.type === 'checklist') {
-      const updatedItems = selectedNote.items?.filter((_, index) => index !== itemIndex) || [];
-      const updatedNote = {
-        ...selectedNote,
-        items: updatedItems,
-      };
-      setSelectedNote(updatedNote);
-      
-      try {
-        await updateNote(selectedNote.id, { items: updatedItems });
-      } catch (error) {
-        console.error('Failed to remove checklist item:', error);
-      }
+    if (selectedNote && selectedNote.items) {
+      const updatedItems = selectedNote.items.filter((_, index) => index !== itemIndex);
+      setSelectedNote(prev => prev ? { ...prev, items: updatedItems } : prev);
+      await updateNote(selectedNote.id, { items: updatedItems });
     }
   }
 
@@ -287,39 +270,31 @@ function updateSelectedNote(update: Partial<Note>) {
                 )) || []}
                 
                 {selectedNote.items?.length === 0 && (
-                  <p className="text-muted-foreground text-sm py-8 text-center border-2 border-dashed rounded-lg">
-                    No items in this checklist yet.
-                  </p>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No items in this checklist</p>
+                    {editMode && <p className="text-sm mt-1">Add items using the button below</p>}
+                  </div>
+                )}
+                
+                {editMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newItems = [...(selectedNote.items || []), { checked: false, body: '' }];
+                      setSelectedNote(prev => prev ? { ...prev, items: newItems } : prev);
+                    }}
+                    className="w-full mt-4"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
                 )}
               </div>
             </div>
-            
-            {editMode && (
-              <Button 
-                onClick={() => setSelectedNote(prev => prev ? { 
-                  ...prev, 
-                  items: [...(prev.items || []), { body: '', checked: false }] 
-                } : prev)}
-                variant="outline"
-                className="w-full"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
-            )}
           </div>
         )}
 
-        <ConfirmationModal
-          isOpen={showDeleteConfirm}
-          onClose={() => setShowDeleteConfirm(false)}
-          onConfirm={handleDeleteNote}
-          title="Delete Note"
-          description={`Are you sure you want to delete "${noteToDelete?.title}"? This action cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          variant="destructive"
-        />
         <NewNoteModal
           isOpen={showNewNoteModal}
           onClose={() => setShowNewNoteModal(false)}
@@ -331,7 +306,7 @@ function updateSelectedNote(update: Partial<Note>) {
 
 
   // Get the notes to display  
-  const notesToDisplay = hasSearchFilter || filteredNotes.length > 0 ? filteredNotes : notes;
+  const notesToDisplay = (hasSearchFilter || filteredNotes.length > 0 ? filteredNotes : notes) || [];
 
   return (
     <div>

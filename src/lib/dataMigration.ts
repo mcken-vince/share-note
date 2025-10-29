@@ -1,5 +1,6 @@
 import type { Note } from '@/types';
 import { generateId } from './generateId';
+import { generateUUID } from './uuid';
 
 /**
  * Legacy note interface without ID field
@@ -16,20 +17,22 @@ interface LegacyNote {
 }
 
 /**
- * Migrates legacy notes (without ID) to the new format (with ID)
+ * Migrates legacy notes (without ID) to the new format (with ID and userId)
  */
 export function migrateLegacyNotes(legacyNotes: LegacyNote[]): Note[] {
+  const legacyUserId = generateUUID(); // Generate a UUID for legacy notes
   return legacyNotes.map(note => ({
     ...note,
     id: generateId(),
+    userId: legacyUserId, // All legacy notes get the same userId
   }));
 }
 
 /**
- * Checks if notes need migration (don't have ID field)
+ * Checks if notes need migration (don't have ID or userId field)
  */
 export function needsMigration(notes: any[]): notes is LegacyNote[] {
-  return notes.length > 0 && !notes[0].hasOwnProperty('id');
+  return notes.length > 0 && (!notes[0].hasOwnProperty('id') || !notes[0].hasOwnProperty('userId'));
 }
 
 /**
