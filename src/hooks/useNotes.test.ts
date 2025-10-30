@@ -19,10 +19,7 @@ jest.mock('@/lib/sampleData', () => ({
   shouldLoadSampleData: jest.fn(() => false),
 }));
 
-// Mock the data migration
-jest.mock('@/lib/dataMigration', () => ({
-  safelyMigrateNotes: jest.fn((notes) => notes),
-}));
+
 
 import { useLocalStorage } from './useLocalStorage';
 import { generateId } from '@/lib/generateId';

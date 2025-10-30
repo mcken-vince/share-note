@@ -7,6 +7,4 @@ export function cn(...inputs: ClassValue[]) {
 
 export { generateId } from './generateId';
 export { serializeNote, deserializeNote, serializeNotes, deserializeNotes } from './dateUtils';
-export { migrateLegacyNotes, needsMigration, safelyMigrateNotes } from './dataMigration';
 export { createSampleNotes, shouldLoadSampleData } from './sampleData';
-export { safeSerializeNote, safeSerializeNotes, ensureNoteDateObjects } from './safeSerialize';

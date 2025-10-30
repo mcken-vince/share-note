@@ -1,17 +1,17 @@
 import type { LoginCredentials, AuthResponse, User } from '@/types';
+import { BaseService } from './BaseService';
 
 /**
  * Service class for handling authentication via API calls
  */
-export class AuthService {
-  private static readonly API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api') + '/auth';
-
+export class AuthService extends BaseService {
+  private static readonly ENDPOINT = '/auth';
   /**
    * Logs in a user with email and password
    */
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/login`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export class AuthService {
     password: string;
   }): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/signup`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/signup'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,7 +68,7 @@ export class AuthService {
    */
   static async verifyToken(token: string): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/verify`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/verify'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,7 +93,7 @@ export class AuthService {
    */
   static async updateProfile(token: string, updates: { firstName?: string; lastName?: string }): Promise<User> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/profile`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ export class AuthService {
    */
   static async changePassword(token: string, newPassword: string): Promise<void> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/change-password`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/change-password'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

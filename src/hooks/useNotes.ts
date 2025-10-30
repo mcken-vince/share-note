@@ -5,7 +5,6 @@ import { useLocalStorage } from './useLocalStorage';
 import type { Note } from '@/types';
 import { serializeNotes, deserializeNotes } from '@/lib/dateUtils';
 import { generateId } from '@/lib/generateId';
-import { safelyMigrateNotes } from '@/lib/dataMigration';
 import { createSampleNotes, shouldLoadSampleData } from '@/lib/sampleData';
 import { generateUUID } from '@/lib/uuid';
 
@@ -25,17 +24,8 @@ export function useNotes() {
   // Use localStorage with serialized notes, deserializing on retrieval
   const [serializedNotes, setSerializedNotes] = useLocalStorage<SerializedNote[]>(NOTES_STORAGE_KEY, []);
   
-  // Convert serialized notes to actual Notes with Date objects and migrate if needed
-  const rawNotes = deserializeNotes(serializedNotes);
-  const notes = safelyMigrateNotes(rawNotes);
-  
-  // If migration happened, update localStorage with migrated data
-  useEffect(() => {
-    if (rawNotes.length !== notes.length || 
-        (notes.length > 0 && rawNotes.length > 0 && rawNotes[0] !== notes[0])) {
-      setSerializedNotes(serializeNotes(notes));
-    }
-  }, [rawNotes, notes, setSerializedNotes]);
+  // Convert serialized notes to actual Notes with Date objects
+  const notes = deserializeNotes(serializedNotes);
 
   // Load sample data on first run
   useEffect(() => {

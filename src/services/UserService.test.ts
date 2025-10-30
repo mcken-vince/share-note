@@ -1,226 +1,225 @@
 import { UserService } from './UserService';
+import { User } from '@/types';
 
-// Create manual mocks for the modules
-const mockReadFile = jest.fn();
-const mockWriteFile = jest.fn();
-const mockBcryptHash = jest.fn();
-const mockBcryptCompare = jest.fn();
-const mockJwtSign = jest.fn();
-const mockJwtVerify = jest.fn();
-
-// Mock the modules
-jest.mock('fs/promises', () => ({
-  readFile: (...args: any[]) => mockReadFile(...args),
-  writeFile: (...args: any[]) => mockWriteFile(...args),
-}));
-
-jest.mock('bcryptjs', () => ({
-  hash: (...args: any[]) => mockBcryptHash(...args),
-  compare: (...args: any[]) => mockBcryptCompare(...args),
-}));
-
-jest.mock('jsonwebtoken', () => ({
-  sign: (...args: any[]) => mockJwtSign(...args),
-  verify: (...args: any[]) => mockJwtVerify(...args),
-}));
+// Mock fetch globally
+global.fetch = jest.fn();
 
 describe('UserService', () => {
-  let userService: UserService;
+  const mockToken = 'mock-jwt-token';
+  const mockUser: User = {
+    id: 'user-123',
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john@example.com',
+  };
 
   beforeEach(() => {
-    userService = new UserService();
     jest.clearAllMocks();
-    mockReadFile.mockReset();
-    mockWriteFile.mockReset();
-    mockBcryptHash.mockReset();
-    mockBcryptCompare.mockReset();
-    mockJwtSign.mockReset();
-    mockJwtVerify.mockReset();
+    (global.fetch as jest.Mock).mockReset();
   });
 
-  describe('findByEmail', () => {
-    it('should find a user by email', async () => {
-      const mockUsers = [
-        { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com', password: 'hashed' },
-        { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@example.com', password: 'hashed' },
-      ];
-      mockReadFile.mockResolvedValueOnce(JSON.stringify(mockUsers));
+  describe('getUserById', () => {
+    it('should fetch a user by ID', async () => {
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({ user: mockUser }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = await userService.findByEmail('john@example.com');
+      const result = await UserService.getUserById(mockToken, 'user-123');
 
-      expect(result).toMatchObject({
-        email: 'john@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-      });
-      expect(result).toHaveProperty('password');
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/user/user-123',
+        {
+          headers: {
+            'Authorization': `Bearer ${mockToken}`,
+          },
+        }
+      );
+      expect(result).toEqual(mockUser);
     });
 
-    it('should return null if user not found', async () => {
-      mockReadFile.mockResolvedValue(JSON.stringify([]));
+    it('should return null if user not found (404)', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = await userService.findByEmail('nonexistent@example.com');
+      const result = await UserService.getUserById(mockToken, 'nonexistent');
 
       expect(result).toBeNull();
     });
 
-    it('should return null if file does not exist', async () => {
-      mockReadFile.mockRejectedValue(new Error('File not found'));
-
-      const result = await userService.findByEmail('any@example.com');
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('createUser', () => {
-    it('should create a new user', async () => {
-      // First call for checking existing user returns empty array
-      // Second call for saving also returns empty array
-      mockReadFile.mockResolvedValueOnce(JSON.stringify([]));
-      mockReadFile.mockResolvedValueOnce(JSON.stringify([]));
-      mockBcryptHash.mockResolvedValue('hashedPassword');
-      mockWriteFile.mockResolvedValue(undefined);
-
-      const userData = {
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        password: 'password123',
+    it('should throw error for other failed requests', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
       };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = await userService.createUser(userData);
-
-      expect(result).toMatchObject({
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-      });
-      expect(result).not.toHaveProperty('password');
-      expect(mockBcryptHash).toHaveBeenCalledWith('password123', 10);
-    });
-
-    it('should throw error if email already exists', async () => {
-      const existingUsers = [
-        { id: '1', firstName: 'John', lastName: 'Doe', email: 'john@example.com', password: 'hashed' },
-      ];
-      mockReadFile.mockResolvedValue(JSON.stringify(existingUsers));
-
-      const userData = {
-        firstName: 'Jane',
-        lastName: 'Smith',
-        email: 'john@example.com',
-        password: 'password123',
-      };
-
-      await expect(userService.createUser(userData)).rejects.toThrow('User with this email already exists');
-    });
-  });
-
-  describe('validateUser', () => {
-    it('should validate user with correct credentials', async () => {
-      const mockUser = {
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        password: 'hashedPassword',
-      };
-      mockReadFile.mockResolvedValue(JSON.stringify([mockUser]));
-      mockBcryptCompare.mockResolvedValue(true);
-
-      const result = await userService.validateUser({
-        email: 'john@example.com',
-        password: 'password123',
-      });
-
-      expect(result).toMatchObject({
-        email: 'john@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-      });
-    });
-
-    it('should return null for invalid password', async () => {
-      const mockUser = {
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        password: 'hashedPassword',
-      };
-      mockReadFile.mockResolvedValue(JSON.stringify([mockUser]));
-      mockBcryptCompare.mockResolvedValue(false);
-
-      const result = await userService.validateUser({
-        email: 'john@example.com',
-        password: 'wrongpassword',
-      });
-
-      expect(result).toBeNull();
-    });
-
-    it('should return null if user not found', async () => {
-      mockReadFile.mockResolvedValue(JSON.stringify([]));
-
-      const result = await userService.validateUser({
-        email: 'nonexistent@example.com',
-        password: 'password123',
-      });
-
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('generateToken', () => {
-    it('should generate a JWT token', () => {
-      const mockUser = {
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-      };
-      mockJwtSign.mockReturnValue('token123');
-
-      const result = userService.generateToken(mockUser);
-
-      expect(result).toBe('token123');
-      expect(mockJwtSign).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: '1',
-          email: 'john@example.com',
-          firstName: 'John',
-          lastName: 'Doe',
-        }),
-        expect.any(String),
-        { expiresIn: '7d' }
+      await expect(UserService.getUserById(mockToken, 'user-123')).rejects.toThrow(
+        'Failed to fetch user: Internal Server Error'
       );
     });
   });
 
-  describe('verifyToken', () => {
-    it('should verify and decode a valid token', () => {
-      const mockDecoded = {
-        id: '1',
-        email: 'john@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
+  describe('updateUser', () => {
+    it('should update user profile', async () => {
+      const updates = { firstName: 'Jane', lastName: 'Smith' };
+      const updatedUser = { ...mockUser, ...updates };
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({ user: updatedUser }),
       };
-      mockJwtVerify.mockReturnValue(mockDecoded);
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = userService.verifyToken('token123');
+      const result = await UserService.updateUser(mockToken, 'user-123', updates);
 
-      expect(result).toEqual(mockDecoded);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/user/user-123',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${mockToken}`,
+          },
+          body: JSON.stringify(updates),
+        }
+      );
+      expect(result).toEqual(updatedUser);
     });
 
-    it('should return null for invalid token', () => {
-      mockJwtVerify.mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
+    it('should throw error if update fails', async () => {
+      const mockResponse = {
+        ok: false,
+        statusText: 'Bad Request',
+        json: jest.fn().mockResolvedValue({ error: 'Invalid data' }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
 
-      const result = userService.verifyToken('invalidtoken');
+      await expect(
+        UserService.updateUser(mockToken, 'user-123', { firstName: 'Jane' })
+      ).rejects.toThrow('Invalid data');
+    });
+  });
 
-      expect(result).toBeNull();
+  describe('updatePassword', () => {
+    it('should update user password', async () => {
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await UserService.updatePassword(
+        mockToken,
+        'user-123',
+        'currentPass123',
+        'newPass456'
+      );
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/user/user-123/password',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${mockToken}`,
+          },
+          body: JSON.stringify({
+            currentPassword: 'currentPass123',
+            newPassword: 'newPass456',
+          }),
+        }
+      );
+    });
+
+    it('should throw error if password update fails', async () => {
+      const mockResponse = {
+        ok: false,
+        statusText: 'Unauthorized',
+        json: jest.fn().mockResolvedValue({ error: 'Current password is incorrect' }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await expect(
+        UserService.updatePassword(mockToken, 'user-123', 'wrongPass', 'newPass')
+      ).rejects.toThrow('Current password is incorrect');
+    });
+  });
+
+  describe('pauseAccount', () => {
+    it('should pause user account', async () => {
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await UserService.pauseAccount(mockToken, 'user-123');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/user/user-123/pause',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${mockToken}`,
+          },
+        }
+      );
+    });
+
+    it('should throw error if pause fails', async () => {
+      const mockResponse = {
+        ok: false,
+        statusText: 'Bad Request',
+        json: jest.fn().mockResolvedValue({ error: 'Cannot pause account' }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await expect(UserService.pauseAccount(mockToken, 'user-123')).rejects.toThrow(
+        'Cannot pause account'
+      );
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('should delete user account', async () => {
+      const mockResponse = {
+        ok: true,
+        json: jest.fn().mockResolvedValue({ success: true }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await UserService.deleteAccount(mockToken, 'user-123', 'password123');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/api/user/user-123/delete',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${mockToken}`,
+          },
+          body: JSON.stringify({ password: 'password123' }),
+        }
+      );
+    });
+
+    it('should throw error if deletion fails', async () => {
+      const mockResponse = {
+        ok: false,
+        statusText: 'Unauthorized',
+        json: jest.fn().mockResolvedValue({ error: 'Incorrect password' }),
+      };
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse);
+
+      await expect(
+        UserService.deleteAccount(mockToken, 'user-123', 'wrongpass')
+      ).rejects.toThrow('Incorrect password');
     });
   });
 });

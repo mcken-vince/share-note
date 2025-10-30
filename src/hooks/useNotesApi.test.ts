@@ -6,11 +6,17 @@ import { act } from 'react';
 // Mock the NotesService
 const mockGetAllNotes = jest.fn();
 const mockSaveAllNotes = jest.fn();
+const mockCreateNote = jest.fn();
+const mockUpdateNote = jest.fn();
+const mockDeleteNote = jest.fn();
 
-jest.mock('@/services/NotesService', () => ({
+jest.mock('@/services', () => ({
   NotesService: {
-    getAllNotes: mockGetAllNotes,
-    saveAllNotes: mockSaveAllNotes,
+    getAllNotes: (...args: any[]) => mockGetAllNotes(...args),
+    saveAllNotes: (...args: any[]) => mockSaveAllNotes(...args),
+    createNote: (...args: any[]) => mockCreateNote(...args),
+    updateNote: (...args: any[]) => mockUpdateNote(...args),
+    deleteNote: (...args: any[]) => mockDeleteNote(...args),
   },
 }));
 
@@ -46,6 +52,9 @@ describe('useNotesApi', () => {
     jest.clearAllMocks();
     mockGetAllNotes.mockClear();
     mockSaveAllNotes.mockClear();
+    mockCreateNote.mockClear();
+    mockUpdateNote.mockClear();
+    mockDeleteNote.mockClear();
   });
 
   it('should load notes on mount', async () => {
@@ -81,7 +90,8 @@ describe('useNotesApi', () => {
 
   it('should create a new note', async () => {
     mockGetAllNotes.mockResolvedValue([]);
-    mockSaveAllNotes.mockResolvedValue(undefined);
+    const newNote = { ...mockNote, id: 'new-id', title: 'New Note', tags: ['new'] };
+    mockCreateNote.mockResolvedValue(newNote);
 
     const { result } = renderHook(() => useNotesApi());
 
@@ -99,22 +109,14 @@ describe('useNotesApi', () => {
       await result.current.createNote(noteData);
     });
 
-    expect(mockSaveAllNotes).toHaveBeenCalled();
-    expect(mockSaveAllNotes).toHaveBeenCalledWith('test-token', expect.any(Array));
-    const savedNotes = mockSaveAllNotes.mock.calls[0][1];
-    expect(savedNotes).toHaveLength(1);
-    expect(savedNotes[0]).toMatchObject({
-      id: 'mock-id-123',
-      userId: 'user-1',
-      title: 'New Note',
-      type: 'note',
-      tags: ['new'],
-    });
+    expect(mockCreateNote).toHaveBeenCalledWith('test-token', noteData);
+    expect(result.current.notes).toContainEqual(newNote);
   });
 
   it('should update an existing note', async () => {
     mockGetAllNotes.mockResolvedValue([mockNote]);
-    mockSaveAllNotes.mockResolvedValue(undefined);
+    const updatedNote = { ...mockNote, title: 'Updated Title', body: 'Updated content' };
+    mockUpdateNote.mockResolvedValue(updatedNote);
 
     const { result } = renderHook(() => useNotesApi());
 
@@ -128,20 +130,17 @@ describe('useNotesApi', () => {
       await result.current.updateNote('1', updates);
     });
 
-    expect(mockSaveAllNotes).toHaveBeenCalled();
-    expect(mockSaveAllNotes).toHaveBeenCalledWith('test-token', expect.any(Array));
-    const savedNotes = mockSaveAllNotes.mock.calls[0][1];
-    expect(savedNotes[0]).toMatchObject({
+    expect(mockUpdateNote).toHaveBeenCalledWith('test-token', '1', updates);
+    expect(result.current.notes[0]).toMatchObject({
       id: '1',
       title: 'Updated Title',
       body: 'Updated content',
     });
-    expect(savedNotes[0].modifiedAt).not.toEqual(mockNote.modifiedAt);
   });
 
   it('should delete a note', async () => {
     mockGetAllNotes.mockResolvedValue([mockNote]);
-    mockSaveAllNotes.mockResolvedValue(undefined);
+    mockDeleteNote.mockResolvedValue(undefined);
 
     const { result } = renderHook(() => useNotesApi());
 
@@ -153,7 +152,8 @@ describe('useNotesApi', () => {
       await result.current.deleteNote('1');
     });
 
-    expect(mockSaveAllNotes).toHaveBeenCalledWith('test-token', []);
+    expect(mockDeleteNote).toHaveBeenCalledWith('test-token', '1');
+    expect(result.current.notes).toEqual([]);
   });
 
   it('should get note by ID', async () => {
@@ -188,7 +188,7 @@ describe('useNotesApi', () => {
 
   it('should handle save errors', async () => {
     mockGetAllNotes.mockResolvedValue([]);
-    mockSaveAllNotes.mockRejectedValue(new Error('Save failed'));
+    mockCreateNote.mockRejectedValue(new Error('Save failed'));
 
     const { result } = renderHook(() => useNotesApi());
 

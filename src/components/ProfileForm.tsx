@@ -8,11 +8,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, Check, User as UserIcon, Settings, Bell } from 'lucide-react';
+import { AlertCircle, Check, User as UserIcon, Settings, Bell, PauseCircle, Trash2, Download } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useAuth } from '@/context';
-import { getCookie, setCookie } from 'cookies-next';
-import { AuthService } from '@/services/AuthService';
+import { getCookie } from 'cookies-next';
+import { UserService, NotesService } from '@/services';
 
 interface ProfileFormData {
   firstName: string;
@@ -31,6 +39,10 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPauseDialog, setShowPauseDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const { logout, updateUser } = useAuth();
 
   const profileForm = useForm<ProfileFormData>({
@@ -59,19 +71,14 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
 
     try {
       const token = getCookie('auth-token');
-      const responseData = await AuthService.updateProfile(token as string, {
-        firstName: data.firstName,
-        lastName: data.lastName,
-      });
-      
-      // Update the token if provided
-      // if (responseData.token) {
-      //   setCookie('auth-token', responseData.token, {
-      //     maxAge: 60 * 60 * 24 * 7, // 7 days
-      //     sameSite: 'lax',
-      //     secure: process.env.NODE_ENV === 'production',
-      //   });
-      // }
+      const responseData = await UserService.updateUser(
+        token as string,
+        user.id,
+        {
+          firstName: data.firstName,
+          lastName: data.lastName,
+        }
+      );
       
       // Update the user state with the new data
       updateUser({
@@ -112,10 +119,12 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
 
     try {
       const token = getCookie('auth-token');
-      // await AuthService.updatePassword(token as string, {
-      //   currentPassword: data.currentPassword!,
-      //   newPassword: data.newPassword!,
-      // });
+      await UserService.updatePassword(
+        token as string,
+        user.id,
+        data.currentPassword!,
+        data.newPassword!
+      );
 
       setSuccessMessage('Password changed successfully!');
       passwordForm.reset();
@@ -126,6 +135,105 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
       setError(err.message || 'Failed to change password');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePauseAccount = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    try {
+      const token = getCookie('auth-token');
+      await UserService.pauseAccount(token as string, user.id);
+      
+      setSuccessMessage('Account paused successfully. You will be logged out.');
+      
+      // Wait 2 seconds then logout
+      setTimeout(() => {
+        logout();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to pause account');
+      setIsLoading(false);
+    } finally {
+      setShowPauseDialog(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setError('Please enter your password to confirm deletion');
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+    setIsLoading(true);
+
+    try {
+      const token = getCookie('auth-token');
+      await UserService.deleteAccount(token as string, user.id, deletePassword);
+      
+      setSuccessMessage('Account deleted successfully. You will be logged out.');
+      
+      // Wait 2 seconds then logout
+      setTimeout(() => {
+        logout();
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete account. Please check your password.');
+      setIsLoading(false);
+    } finally {
+      setShowDeleteDialog(false);
+      setDeletePassword('');
+    }
+  };
+
+  const handleExportData = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    setIsExporting(true);
+
+    try {
+      const token = getCookie('auth-token');
+      const notes = await NotesService.getAllNotes(token as string);
+      
+      // Create the export data
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        user: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+        },
+        notes: notes,
+        totalNotes: notes.length,
+      };
+
+      // Convert to JSON string
+      const jsonString = JSON.stringify(exportData, null, 2);
+      
+      // Create blob and download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `share-note-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setSuccessMessage(`Successfully exported ${notes.length} notes!`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to export data');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -303,6 +411,46 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
                   Sign Out
                 </Button>
               </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-orange-600">Pause Account</p>
+                  <p className="text-sm text-gray-500">
+                    Temporarily deactivate your account. You can reactivate it by logging in.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  onClick={() => setShowPauseDialog(true)}
+                  disabled={isLoading}
+                >
+                  <PauseCircle className="h-4 w-4 mr-2" />
+                  Pause Account
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-red-600">Delete Account</p>
+                  <p className="text-sm text-gray-500">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Account
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -342,13 +490,91 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ user }) => {
                     <p className="font-medium">Export Data</p>
                     <p className="text-sm text-gray-500">Download all your notes in JSON format.</p>
                   </div>
-                  <p className="text-sm text-gray-400">Coming soon</p>
+                  <Button
+                    variant="outline"
+                    onClick={handleExportData}
+                    disabled={isExporting || isLoading}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {isExporting ? 'Exporting...' : 'Export Notes'}
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Pause Account Dialog */}
+      <Dialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pause Account</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to pause your account? You can reactivate it anytime by logging in again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowPauseDialog(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              className="bg-orange-600 hover:bg-orange-700"
+              onClick={handlePauseAccount}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Pausing...' : 'Pause Account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Account</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="delete-password">Enter your password to confirm</Label>
+            <Input
+              id="delete-password"
+              type="password"
+              placeholder="Your password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setDeletePassword('');
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Deleting...' : 'Delete Account'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

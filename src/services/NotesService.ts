@@ -1,17 +1,17 @@
 import type { Note } from '@/types';
+import { BaseService } from './BaseService';
 
 /**
  * Service class for managing notes via API calls
  */
-export class NotesService {
-  private static readonly API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL  || 'http://localhost:3000/api') + '/notes';
-
+export class NotesService extends BaseService {
+  private static readonly ENDPOINT = '/notes';
   /**
    * Fetches all notes from the server
    */
   static async getAllNotes(token: string): Promise<Note[]> {
     try {
-      const response = await fetch(this.API_BASE_URL, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -36,7 +36,7 @@ export class NotesService {
    */
   static async saveAllNotes(token: string, notes: Note[]): Promise<void> {
     try {
-      const response = await fetch(this.API_BASE_URL, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ export class NotesService {
     }
   ): Promise<Note> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/create`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, '/create'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ export class NotesService {
     updates: Partial<Omit<Note, 'id' | 'userId' | 'createdAt'>>
   ): Promise<Note> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/${noteId}`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${noteId}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ export class NotesService {
    */
   static async deleteNote(token: string, noteId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.API_BASE_URL}/${noteId}`, {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${noteId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

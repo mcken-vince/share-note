@@ -1,158 +1,140 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User, UserWithPassword, LoginCredentials } from '@/types';
-import { generateUUID } from '@/lib/uuid';
-import { readFile, writeFile } from 'fs/promises';
-import path from 'path';
+import { User } from '@/types';
+import { BaseService } from './BaseService';
 
-const DATA_FILE_PATH = path.join(process.cwd(), 'data', 'users.json');
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-export class UserService {
-  private async readUsers(): Promise<UserWithPassword[]> {
+/**
+ * Service class for managing user operations via API calls
+ */
+export class UserService extends BaseService {
+  private static readonly ENDPOINT = '/user';
+  /**
+   * Gets user by ID
+   */
+  static async getUserById(token: string, userId: string): Promise<User | null> {
     try {
-      const data = await readFile(DATA_FILE_PATH, 'utf-8');
-      return JSON.parse(data);
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${userId}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`Failed to fetch user: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.user;
     } catch (error) {
-      // If file doesn't exist, return empty array
-      return [];
+      console.error('Error fetching user:', error);
+      throw error;
     }
   }
 
-  private async writeUsers(users: UserWithPassword[]): Promise<void> {
-    await writeFile(DATA_FILE_PATH, JSON.stringify(users, null, 2));
-  }
-
-  async findByEmail(email: string): Promise<UserWithPassword | null> {
-    const users = await this.readUsers();
-    return users.find(user => user.email === email) || null;
-  }
-
-  async getUserById(id: string): Promise<User | null> {
-    const users = await this.readUsers();
-    const user = users.find(u => u.id === id);
-    
-    if (!user) {
-      return null;
-    }
-
-    // Return user without password
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-  }
-
-  async createUser(userData: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    password: string;
-  }): Promise<User> {
-    // Check if user already exists
-    const existingUser = await this.findByEmail(userData.email);
-    if (existingUser) {
-      throw new Error('User with this email already exists');
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-    
-    // Create new user with UUID
-    const newUser: UserWithPassword = {
-      id: generateUUID(),
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      password: hashedPassword,
-    };
-
-    // Save to file
-    const users = await this.readUsers();
-    users.push(newUser);
-    await this.writeUsers(users);
-
-    // Return user without password
-    const { password, ...userWithoutPassword } = newUser;
-    return userWithoutPassword;
-  }
-
-  async validateUser(credentials: LoginCredentials): Promise<User | null> {
-    const user = await this.findByEmail(credentials.email);
-    if (!user) {
-      return null;
-    }
-
-    const isValidPassword = await bcrypt.compare(credentials.password, user.password);
-    if (!isValidPassword) {
-      return null;
-    }
-
-    // Return user without password
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-  }
-
-  generateToken(user: User): string {
-    return jwt.sign(
-      { 
-        id: user.id, 
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-  }
-
-  verifyToken(token: string): User | null {
+  /**
+   * Updates user profile information
+   */
+  static async updateUser(
+    token: string,
+    userId: string,
+    updates: { firstName?: string; lastName?: string }
+  ): Promise<User> {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      return {
-        id: decoded.id,
-        email: decoded.email,
-        firstName: decoded.firstName,
-        lastName: decoded.lastName,
-      };
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${userId}`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to update user: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.user;
     } catch (error) {
-      return null;
+      console.error('Error updating user:', error);
+      throw error;
     }
   }
 
-  async updateUser(userId: string, updates: { firstName?: string; lastName?: string }): Promise<User> {
-    const users = await this.readUsers();
-    const userIndex = users.findIndex(u => u.id === userId);
-    
-    if (userIndex === -1) {
-      throw new Error('User not found');
+  /**
+   * Updates user password
+   */
+  static async updatePassword(
+    token: string,
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    try {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${userId}/password`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to update password: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error updating password:', error);
+      throw error;
     }
-
-    // Update user data
-    users[userIndex] = {
-      ...users[userIndex],
-      ...updates,
-    };
-
-    await this.writeUsers(users);
-
-    // Return updated user without password
-    const { password, ...userWithoutPassword } = users[userIndex];
-    return userWithoutPassword;
   }
 
-  async updatePassword(userId: string, newPassword: string): Promise<void> {
-    const users = await this.readUsers();
-    const userIndex = users.findIndex(u => u.id === userId);
-    
-    if (userIndex === -1) {
-      throw new Error('User not found');
-    }
+  /**
+   * Pauses user account (deactivates temporarily)
+   */
+  static async pauseAccount(token: string, userId: string): Promise<void> {
+    try {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${userId}/pause`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-    // Hash the new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
-    // Update password
-    users[userIndex].password = hashedPassword;
-    
-    await this.writeUsers(users);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to pause account: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error pausing account:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes user account permanently
+   */
+  static async deleteAccount(token: string, userId: string, password: string): Promise<void> {
+    try {
+      const response = await fetch(this.buildUrl(this.ENDPOINT, `/${userId}/delete`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to delete account: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      throw error;
+    }
   }
 }
